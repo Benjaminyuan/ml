@@ -4,9 +4,9 @@ import codecs
 import numpy as np
 import jieba
 C = [-1,0,1]
+vocabulary = set()
 def train(docu,C):
     docu_class_map = {}
-    vocabulary = set()
     logprior = {}
     N_doc = docu.shape[0]
     bigdoc = {}
@@ -37,28 +37,82 @@ def train(docu,C):
             for w in seg_list:
                 count[w] = count.get(w,0)+1
         # 对全局的词进行统计
+        wsum = 0;
+        for i in count.values():
+            wsum += i
         for w in vocabulary:
             wcout = loglikelihood.get(w,{})
-            wcout[c] = wcout.get(c,0)+count.get(w,0)
+            wcout[c] = math.log((count.get(w,0)+1)/(wsum+len(vocabulary)),2)
             loglikelihood[w] = wcout;
     return logprior,loglikelihood
-def read_data(test_label):
-    res = []
+
+def read_data(train,test_labled):
+    train_res = []
+    test_data = []
+    test_label = [] 
     countOne = 0
-    with codecs.open(test_label,'rb','utf-8') as csvfile:
-        # reader = csv.DictReader(csvfile)
-        # for row in reader:
-        #     print(row)
+    with codecs.open(train,'rb','utf-8') as csvfile:
         csvfile.readline();
         for row in csvfile:
             line = row.rsplit(',',1)
             if int(line[1]) == -1:
                 countOne += 1
-            res.append([line[0],line[1]])
-    print(countOne)
-    return np.array(res)
-res = read_data("../data/test_labled.csv")
+            train_res.append([line[0],line[1]])
+    with codecs.open(test_labled,'rb','utf-8') as csvfile:
+        csvfile.readline();
+        for row in csvfile:
+            line = row.rsplit(',',1)
+            if int(line[1]) == -1:
+                countOne += 1
+            test_data.append(line[0])
+            test_label.append(line[1])
+    return np.array(train_res),np.array(test_data),np.array(test_label)
+def test_naive_bayes(test_doc,logprior,loglikelihood,C):
+    sum = {}
+    for c in C:
+        sum[c] = logprior[c]
+        # 分词
+        seg_list = jieba.cut(test_doc,cut_all=False)
+        for w in seg_list:
+            if w in vocabulary:
+                sum[c] += sum[c] + loglikelihood[w][c]
+    maxC = '0'
+    maxN = sum[maxC]
+    for c in C:
+        if sum[c] > maxN:
+            maxN = sum[c]
+            maxC = c
+    return maxN,maxC
+def test(test_list,test_label,logprior,loglikelihood,C):
+    res = []
+    TP = 0
+    TN = 0
+    FN = 0
+    FP = 0
+    R = 0
+    for i in range(len(test_list)):
+        maxN,maxC = test_naive_bayes(test_list[i],logprior,loglikelihood,C)
+        print(maxC,test_label[i])
+        if int(maxC) == int(test_label[i]):
+            R += 1 
+            if maxC == '1':
+                TP += 1
+            elif maxC == '-1':
+                TN += 1
+        else:
+            if int(maxC) == 1 and int(test_label[i]) == -1:
+                FP += 1 
+            elif int(maxC) == -1 and int(test_label[i]) == 1:
+                FN += 1 
+    print(R,TP,TN,FP,FN)
+    precision = TP/(TP+FP)
+    print('pricision: ',precision)
+    recall = TP/(TP+FN)
+    print('recall',recall)
+    print('F1-score:',2*precision*recall/(precision+recall))
+train_data,test_data,test_label = read_data("../data/train.csv","../data/test_labled.csv")
 c = ['-1','0','1']
-logprior,loglikelihood = train(res,c)
+print(train_data)
+logprior,loglikelihood = train(train_data,c)
 print(logprior)
-print(loglikelihood)
+test(test_data,test_label,logprior,loglikelihood,c)
