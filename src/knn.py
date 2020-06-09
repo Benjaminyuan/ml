@@ -1,7 +1,7 @@
 import codecs
 import numpy as np
 import jieba
-k = 6
+k = 20
 stop_word = []
 def read_stop_word(stop_word):
     res = []
@@ -35,7 +35,7 @@ def read_data(train,test_labled):
 
 
 def train(test_data,test_label,train_data,train_label):
-    for i in range(1):
+    for i in range(200):
         label = test(test_data[i],train_data,train_label)
         print(label,test_label[i])
 def test(test_data,train_data,train_label):
