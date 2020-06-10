@@ -5,6 +5,12 @@ import numpy as np
 import jieba
 C = [-1,0,1]
 vocabulary = set()
+def read_stop_word(stop_word):
+    res = []
+    with codecs.open(stop_word,'rb','utf-8') as csvfile:
+        for row in csvfile:
+            res.append(row.split('\n')[0])
+    return res
 def train(docu,C):
     docu_class_map = {}
     logprior = {}
@@ -19,9 +25,9 @@ def train(docu,C):
         t.append(a[0])
         docu_class_map[int(a[1])] = t
     # print(docu_class_map)
-    for a in docu:
-        seg_list = jieba.cut(a[0],cut_all=False)
-        vocabulary.update(seg_list)
+    # for a in docu:
+    #     seg_list = jieba.cut(a[0],cut_all=False)
+    #     vocabulary.update(seg_list)
     #遍历每一种类别
     for c in C:
         #获取类别列表
@@ -57,7 +63,7 @@ def read_data(train,test_labled):
             line = row.rsplit(',',1)
             if int(line[1]) == -1:
                 countOne += 1
-            train_res.append([line[0],line[1]])
+            train_res.append([line[0],line[1].split('\r')[0]])
     with codecs.open(test_labled,'rb','utf-8') as csvfile:
         csvfile.readline();
         for row in csvfile:
@@ -110,9 +116,40 @@ def test(test_list,test_label,logprior,loglikelihood,C):
     recall = TP/(TP+FN)
     print('recall',recall)
     print('F1-score:',2*precision*recall/(precision+recall))
+def countWord(train_data):
+    C = ['-1','0','1']
+    word_count = {}
+    stop_words = read_stop_word("../stopwords-master/cn_stopwords.txt")
+    for line in train_data:
+        seg_list = jieba.cut(line[0],cut_all=False)
+        c = line[1]
+        for w in seg_list:
+            c_word_count = word_count.get(w,{})
+            c_word_count[c] = c_word_count.get(c,0)+1
+            word_count[w] = c_word_count
+    c_count_list = {}
+    for c in C:
+        m = {}
+        for w in word_count.keys():
+            wc_map = word_count[w]
+            if c in wc_map:
+                m[w] = wc_map.get(c,0)
+        c_count_list[c] = m
+    c_word_sorted_count = sorted(c_count_list['-1'].items(),key=lambda item:item[1],reverse = True)
+    c_word_sorted_count.extend(sorted(c_count_list['0'].items(),key=lambda item:item[1],reverse = True))
+    c_word_sorted_count.extend(sorted(c_count_list['1'].items(),key=lambda item:item[1],reverse = True))
+    for word in c_word_sorted_count:
+        if word[0] not in stop_words and word[1] > 10:
+            print(word)
+            vocabulary.add(word[0])
+    # print(vocabulary)
+    return 
+
 train_data,test_data,test_label = read_data("../data/train.csv","../data/test_labled.csv")
+
 c = ['-1','0','1']
-print(train_data)
+# print(train_data)
+countWord(train_data)
 logprior,loglikelihood = train(train_data,c)
 print(logprior)
 test(test_data,test_label,logprior,loglikelihood,c)
