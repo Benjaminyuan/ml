@@ -3,43 +3,9 @@ import numpy as np
 import jieba
 k = 5
 stop_word = []
-vocabulary_naga = set()
-vocabulary_zero = set()
-vocabulary_pos = set()
-def Knn_classfy(newInput, newmarkedwords, dataset,datasetmarkedwords, labels,k):
-    squaredDist=[0 for j in range(len(dataset))]
-    distance=[0 for j in range(len(dataset))]
-    for i in range(len(dataset)):
-        for j in range(len(datasetmarkedwords[i])):
-            column=datasetmarkedwords[i][j]
-            squaredDist[i] +=(dataset[i][column]-newInput[column]) ** 2
-        for j in range(len(newmarkedwords)):
-            column=newmarkedwords[j]
-            squaredDist[i] +=(dataset[i][column]-newInput[column]) ** 2
-        distance[i]=squaredDist[i] ** 0.5
-        
-    ## step 2: sort the distance
-    # argsort() returns the indices that would sort an array in a ascending order  
-    sortedDistIndices = np.argsort(distance)
-	    
-    positive_label=0
-    negative_label=0
-    predict=0
-    for i in range(k):  
-        ## step 3: choose the min k distance  
-	    voteLabel = labels[sortedDistIndices[i]]
-	    ## step 4: count the times labels occur  
-	    if(voteLabel==1):
-	        positive_label+=1
-	    else :
-	        negative_label+=1
-    ## step 5: the max voted class will return
-    if(positive_label>=negative_label):
-        predict=1
-    else:
-        predict=0
-    return predict
-
+# 词空间
+vocabulary = set()
+words_idx = {}
 def read_stop_word(stop_word):
     res = []
     with codecs.open(stop_word,'rb','utf-8') as csvfile:
@@ -77,8 +43,8 @@ def train(test_data,test_label,train_data,train_label):
     FN = 0
     FP = 0
     R = 0
-    for i in range(len(test_data)):
-        label = test(test_data[i],train_data,train_label)
+    for i in range(200):
+        label = classify0(test_data[i],train_data,train_label)
         print(label,test_label[i])
         if int(label) == int(test_label[i]):
             R += 1 
@@ -97,25 +63,21 @@ def train(test_data,test_label,train_data,train_label):
     recall = TP/(TP+FN)
     print('recall',recall)
     print('F1-score:',2*precision*recall/(precision+recall))
-def test(test_data,train_data,train_label):
-    seg_list = jieba.cut(test_data,cut_all=False)
-    count = np.zeros(len(train_data))
-    for i in range(len(train_data)):
-        for w in seg_list:
-            if w in vocabulary_naga and w in train_data[i]:
-               count[i] += 6
-            elif w in vocabulary_pos and w in train_data[i]:
-               count[i] += 1
-            elif w in vocabulary_zero and w in train_data[i]:
-               count[i] += 2
-           
-    sorted_count = count.argsort()
+def classify0(inX,data_set,labels):
+    data_set_size = data_set.shape[0]
+    # 求和每个训练数据的距离差
+    diff_matrix =  np.tile(inX,(data_set_size,1)) - data_set
+    # 求和每个训练数据的距离差平方、求和、开方
+    sqrt_diff_matrix = diff_matrix**2
+    sqrt_distance = sqrt_diff_matrix.sum(axis=1)
+    sqrt_distance = sqrt_distance ** 0.5
+    sorted_distance_indicies = sqrt_distance.argsort()
     class_count = {}
     for i in range(k):
-        vote_label = train_label[sorted_count[i]]
+        #投票
+        vote_label = labels[sorted_distance_indicies[i]]
         class_count[vote_label] = class_count.get(vote_label,0) + 1
     sorted_vote_count = sorted(class_count.items(),key=lambda item:item[1],reverse = True)
-    print(sorted_vote_count)
     return sorted_vote_count[0][0]
 def countWord(train_data,train_label):
     C = ['-1','0','1']
@@ -137,24 +99,41 @@ def countWord(train_data,train_label):
                 m[w] = wc_map.get(c,0)
         c_count_list[c] = m
     c_word_sorted_count = sorted(c_count_list['-1'].items(),key=lambda item:item[1],reverse = True)
-    word_0_sorted_count = sorted(c_count_list['0'].items(),key=lambda item:item[1],reverse = True)
-    word_1_sorted_count = sorted(c_count_list['1'].items(),key=lambda item:item[1],reverse = True)
+    print(len(c_word_sorted_count))
+    l0 = sorted(c_count_list['0'].items(),key=lambda item:item[1],reverse = True)
+    c_word_sorted_count.extend(l0)
+    l1 = sorted(c_count_list['1'].items(),key=lambda item:item[1],reverse = True)
+    c_word_sorted_count.extend(l1)
     for word in c_word_sorted_count:
-        if word[0] not in stop_words and word[1] > 100:
-            print(word)
-            vocabulary_naga.add(word[0])
-    for word in word_0_sorted_count:
-        if word[0] not in stop_words and word[1] > 1000:
-            print(word)
-            vocabulary_zero.add(word[0])
-    for word in word_1_sorted_count:
-        if word[0] not in stop_words and word[1] > 1000:
-            print(word)
-            vocabulary_pos.add(word[0])
-    # print(vocabulary)
+        if word[0] not in stop_words and word[1] > 150:
+            vocabulary.add(word[0])
+    i = 0
+    for w in vocabulary:
+        words_idx[w] = i
+        i += 1 
+    # print(len(l0),len(l1),len(vocabulary))
     return 
+def word_to_vec(words,vocabulary):
+    words = list(words)
+    size = len(vocabulary)
+    res = np.zeros(size)
+    words_set = set(words)
+    for w in words_set:
+        if w in vocabulary:
+            # print(words_idx[w],words.count(w))
+            res[words_idx[w]] = words.count(w)
+    return res
+def data_vec(data):
+    res = []
+    for w in data:
+        seg_list = list(jieba.cut(w,cut_all=False))
+        res.append(word_to_vec(seg_list,vocabulary))
+    # print(np.array(res))
+    return np.array(res)
+    
 stop_word = read_stop_word("../stopwords-master/cn_stopwords.txt")
-print(stop_word)
 train_data,train_label,test_data,test_label = read_data("../data/train.csv","../data/test_labled.csv")
 countWord(train_data,train_label)
+train_data = data_vec(train_data)
+test_data = data_vec(test_data)
 train(test_data,test_label,train_data,train_label)
