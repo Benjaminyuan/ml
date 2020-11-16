@@ -28,7 +28,7 @@ def train(docu,C):
     # for a in docu:
     #     seg_list = jieba.cut(a[0],cut_all=False)
     #     vocabulary.update(seg_list)
-    #遍历每一种类别
+    #遍历每一种类别[-1,0,1]
     for c in C:
         #获取类别列表
         N_clist = docu_class_map[int(c)]
@@ -98,7 +98,7 @@ def test(test_list,test_label,logprior,loglikelihood,C):
     R = 0
     for i in range(len(test_list)):
         maxN,maxC = test_naive_bayes(test_list[i],logprior,loglikelihood,C)
-        print(maxC,test_label[i])
+        # print(maxC,test_label[i])
         if int(maxC) == int(test_label[i]):
             R += 1 
             if maxC == '1':
@@ -111,11 +111,16 @@ def test(test_list,test_label,logprior,loglikelihood,C):
             elif int(maxC) == -1 and int(test_label[i]) == 1:
                 FN += 1 
     print(R,TP,TN,FP,FN)
+    # 精确率
     precision = TP/(TP+FP)
     print('pricision: ',precision)
+    #召回率
     recall = TP/(TP+FN)
     print('recall',recall)
-    print('F1-score:',2*precision*recall/(precision+recall))
+    # F1
+    f1 = 2*precision*recall/(precision+recall)
+    print('F1-score:',f1)
+    return precision,recall,f1
 def countWord(train_data):
     C = ['-1','0','1']
     word_count = {}
@@ -139,17 +144,20 @@ def countWord(train_data):
     c_word_sorted_count.extend(sorted(c_count_list['0'].items(),key=lambda item:item[1],reverse = True))
     c_word_sorted_count.extend(sorted(c_count_list['1'].items(),key=lambda item:item[1],reverse = True))
     for word in c_word_sorted_count:
+        #and word[1] > 10
         if word[0] not in stop_words and word[1] > 10:
             print(word)
             vocabulary.add(word[0])
     # print(vocabulary)
     return 
-
 train_data,test_data,test_label = read_data("../data/train.csv","../data/test_labled.csv")
 
 c = ['-1','0','1']
 # print(train_data)
+# pricision:  0.8123300090661831
+# recall 0.7272727272727273
+# F1-score: 0.7674518201284797
 countWord(train_data)
 logprior,loglikelihood = train(train_data,c)
 print(logprior)
-test(test_data,test_label,logprior,loglikelihood,c)
+precision,recall,f1 = test(test_data,test_label,logprior,loglikelihood,c)

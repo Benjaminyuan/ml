@@ -1,7 +1,7 @@
 import codecs
 import numpy as np
 import jieba
-k = 5
+k = 10
 stop_word = []
 # 词空间
 vocabulary = set()
@@ -43,9 +43,9 @@ def train(test_data,test_label,train_data,train_label):
     FN = 0
     FP = 0
     R = 0
-    for i in range(200):
+    for i in range(len(test_data)):
         label = classify0(test_data[i],train_data,train_label)
-        print(label,test_label[i])
+        # print(label,test_label[i])
         if int(label) == int(test_label[i]):
             R += 1 
             if int(label) == 1:
@@ -58,11 +58,16 @@ def train(test_data,test_label,train_data,train_label):
             elif int(label) == -1 and int(test_label[i]) == 1:
                 FN += 1 
     print(R,TP,TN,FP,FN)
+    # 精确率
     precision = TP/(TP+FP)
     print('pricision: ',precision)
+    #召回率
     recall = TP/(TP+FN)
     print('recall',recall)
-    print('F1-score:',2*precision*recall/(precision+recall))
+    # F1
+    f1 = 2*precision*recall/(precision+recall)
+    print('F1-score:',f1)
+    return precision,recall,f1
 def classify0(inX,data_set,labels):
     data_set_size = data_set.shape[0]
     # 求和每个训练数据的距离差
@@ -113,6 +118,11 @@ def countWord(train_data,train_label):
         i += 1 
     # print(len(l0),len(l1),len(vocabulary))
     return 
+def normalization(data):
+    _range = np.max(data) - np.min(data)
+    if _range == 0:
+        return data
+    return (data- np.min(data))/_range
 def word_to_vec(words,vocabulary):
     words = list(words)
     size = len(vocabulary)
@@ -122,7 +132,7 @@ def word_to_vec(words,vocabulary):
         if w in vocabulary:
             # print(words_idx[w],words.count(w))
             res[words_idx[w]] = words.count(w)
-    return res
+    return normalization(res)
 def data_vec(data):
     res = []
     for w in data:
@@ -130,10 +140,15 @@ def data_vec(data):
         res.append(word_to_vec(seg_list,vocabulary))
     # print(np.array(res))
     return np.array(res)
-    
+
 stop_word = read_stop_word("../stopwords-master/cn_stopwords.txt")
 train_data,train_label,test_data,test_label = read_data("../data/train.csv","../data/test_labled.csv")
 countWord(train_data,train_label)
 train_data = data_vec(train_data)
 test_data = data_vec(test_data)
-train(test_data,test_label,train_data,train_label)
+
+res = [] 
+for i in range(1,15):
+    k = i + 1
+    precision,recall,f1 = train(test_data,test_label,train_data,train_label)
+    res.append([precision,recall,f1])
